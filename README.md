@@ -1,4 +1,4 @@
-[comment]: <> (# 2DGS)
+[comment]: <> (# DPVO)
 
 <!-- PROJECT LOGO -->
 
@@ -11,7 +11,7 @@
   <h3 align="center">
   <a href="https://arxiv.org/pdf/2208.04726">Paper</a> 
   | <a href="https://github.com/princeton-vl/DPVO">Original Github Page</a>
-  | <a href="https://blog.csdn.net/gwplovekimi/article/details/139115674?spm=1001.2014.3001.5501">CSDN 配置教程</a>
+  | <a href="https://blog.csdn.net/gwplovekimi/article/details/139436796?spm=1001.2014.3001.5501">CSDN 配置教程</a>
   </h3>
   <div align="center"></div>
 
