@@ -91,14 +91,16 @@ class Update(nn.Module):
 
         return net, (self.d(net), self.w(net), None)
 
-
+# 一个继承自 nn.Module 的类，负责将输入图像分割成小块（patch）并进行处理。
 class Patchifier(nn.Module):
     def __init__(self, patch_size=3):
         super(Patchifier, self).__init__()
-        self.patch_size = patch_size
-        self.fnet = BasicEncoder4(output_dim=128, norm_fn='instance')
-        self.inet = BasicEncoder4(output_dim=DIM, norm_fn='none')
-
+        self.patch_size = patch_size #patch_size为3（传入及默认的都为3）
+        # 卷积网络的编码器。主要作用是对输入图像进行特征提取，经过多个卷积层和归一化层的处理，最后输出一个指定维度的特征图。
+        self.fnet = BasicEncoder4(output_dim=128, norm_fn='instance') #输出维度为128，norm_fn为归一化形式（进行patch特征的提取）
+        self.inet = BasicEncoder4(output_dim=DIM, norm_fn='none')#输出维度为384（DIM）
+    
+    # 计算图像的梯度
     def __image_gradient(self, images):
         gray = ((images + 0.5) * (255.0 / 2)).sum(dim=2)
         dx = gray[...,:-1,1:] - gray[...,:-1,:-1]
@@ -168,15 +170,16 @@ class CorrBlock:
             corrs += [ altcorr.corr(self.gmap, self.pyramid[i], coords / self.levels[i], ii, jj, self.radius, self.dropout) ]
         return torch.stack(corrs, -1).view(1, len(ii), -1)
 
-
-class VONet(nn.Module):
+# 定义的VO网络
+class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网络模型。
+    # 初始化（构造）函数
     def __init__(self, use_viewer=False):
         super(VONet, self).__init__()
-        self.P = 3
+        self.P = 3  #patch size为3
         self.patchify = Patchifier(self.P)
         self.update = Update(self.P)
 
-        self.DIM = DIM
+        self.DIM = DIM  #为384？？？
         self.RES = 4
 
 

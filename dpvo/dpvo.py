@@ -82,8 +82,9 @@ class DPVO:
         # store relative poses for removed frames
         self.delta = {}
 
+        # 可视化初始为None（在start_viewer函数中进行设置）
         self.viewer = None
-        if viz:
+        if viz:#如果可视化为True，则启动查看器。
             self.start_viewer()
 
     # 加载权重（self:是该方法所属类的实例。）
@@ -325,6 +326,7 @@ class DPVO:
     def __call__(self, tstamp, image, intrinsics):
         """ track new frame """
 
+        # 如果可视化为True，则更新查看器的图像
         if self.viewer is not None:
             self.viewer.update_image(image)
             self.viewer.loop()
