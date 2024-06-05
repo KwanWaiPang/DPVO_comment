@@ -22,7 +22,7 @@ class DPVO:
         self.is_initialized = False
         self.enable_timing = False
         
-        self.n = 0      # number of frames
+        self.n = 0      # number of frames（第几帧）
         self.m = 0      # number of patches
         self.M = self.cfg.PATCHES_PER_FRAME
         self.N = self.cfg.BUFFER_SIZE
@@ -275,11 +275,12 @@ class DPVO:
         self.remove_factors(to_remove)
 
     def update(self):
+        # 使用了一个计时器，记录了代码块中的执行时间，用于性能分析。
         with Timer("other", enabled=self.enable_timing):
-            coords = self.reproject()
+            coords = self.reproject() #重投影
 
-            with autocast(enabled=True):
-                corr = self.corr(coords)
+            with autocast(enabled=True):#自动混合精度计算
+                corr = self.corr(coords) #计算相关性，获取当前帧与上一帧之间的特征匹配信息。
                 ctx = self.imap[:,self.kk % (self.M * self.mem)]
                 self.net, (delta, weight, _) = \
                     self.network.update(self.net, ctx, corr, None, self.ii, self.jj, self.kk)
@@ -288,6 +289,7 @@ class DPVO:
             weight = weight.float()
             target = coords[...,self.P//2,self.P//2] + delta.float()
 
+        # 进行BA优化
         with Timer("BA", enabled=self.enable_timing):
             t0 = self.n - self.cfg.OPTIMIZATION_WINDOW if self.is_initialized else 1
             t0 = max(t0, 1)
@@ -298,6 +300,7 @@ class DPVO:
             except:
                 print("Warning BA failed...")
             
+            # 更新点云
             points = pops.point_cloud(SE3(self.poses), self.patches[:, :self.m], self.intrinsics, self.ix[:self.m])
             points = (points[...,1,1,:3] / points[...,1,1,3:]).reshape(-1, 3)
             self.points_[:len(points)] = points[:]
@@ -308,12 +311,13 @@ class DPVO:
             torch.arange(0, self.n, device="cuda"), indexing='ij')
 
     def __edges_forw(self):
-        r=self.cfg.PATCH_LIFETIME
-        t0 = self.M * max((self.n - r), 0)
-        t1 = self.M * max((self.n - 1), 0)
+        r=self.cfg.PATCH_LIFETIME #patch的生命周期
+        t0 = self.M * max((self.n - r), 0) #计算前向边的起始时间点，等于当前帧索引减去生命周期的帧数，然后乘以一个步长 M。
+        t1 = self.M * max((self.n - 1), 0) #计算前向边的结束时间点，等于当前帧索引减去1的帧数，然后乘以步长 M。
+        # flatmeshgrid生成一个网格，用于表示帧之间的边。
         return flatmeshgrid(
-            torch.arange(t0, t1, device="cuda"),
-            torch.arange(self.n-1, self.n, device="cuda"), indexing='ij')
+            torch.arange(t0, t1, device="cuda"), #生成从 t0 到 t1 之间的整数序列，表示前向边的起点。
+            torch.arange(self.n-1, self.n, device="cuda"), indexing='ij') #生成从 self.n - 1 到 self.n 之间的整数序列，表示前向边的终点。
 
     def __edges_back(self):
         r=self.cfg.PATCH_LIFETIME
@@ -367,7 +371,7 @@ class DPVO:
                 P2 = SE3(self.poses_[self.n-2])
                 
                 xi = self.cfg.MOTION_DAMPING * (P1 * P2.inv()).log()
-                tvec_qvec = (SE3.exp(xi) * P1).data
+                tvec_qvec = (SE3.exp(xi) * P1).data #通过指数映射回到李群（刚体变换）
                 self.poses_[self.n] = tvec_qvec
             else:#否则的话，将姿态设置为上一帧的姿态。
                 tvec_qvec = self.poses[self.n-1]
@@ -400,6 +404,9 @@ class DPVO:
         self.m += self.M
 
         # relative pose（添加前向和后向因子）
+        # 这两个方法的主要功能是为当前帧计算前向和后向的边。
+        # 这些边表示帧之间的关系，用于视觉里程计中的图优化或者帧之间的关联性计算。
+        # 从而更好地估计和优化相机的运动轨迹。
         self.append_factors(*self.__edges_forw())
         self.append_factors(*self.__edges_back())
 
