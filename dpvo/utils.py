@@ -35,19 +35,28 @@ def coords_grid(b, n, h, w, **kwargs):
     coords = torch.stack(torch.meshgrid(y, x, indexing="ij"))
     return coords[[1,0]].view(1, 1, 2, h, w).repeat(b, n, 1, 1, 1)
 
+# 用于生成包含帧索引的坐标网格
 def coords_grid_with_index(d, **kwargs):
     """ coordinate grid with frame index"""
+    # d为输入的视差图，前面初始化为1，size跟输入的image一样。
     b, n, h, w = d.shape
     i = torch.ones_like(d)
+    # 使用 torch.arange 生成从 0 到 w-1 的一维张量 x 和从 0 到 h-1 的一维张量 y
     x = torch.arange(0, w, dtype=torch.float, **kwargs)
     y = torch.arange(0, h, dtype=torch.float, **kwargs)
 
+    # 使用 torch.meshgrid 生成二维网格坐标，并使用 torch.stack 将其堆叠成 [2, h, w] 的张量。
     y, x = torch.stack(torch.meshgrid(y, x, indexing="ij"))
+    # 将 y 和 x 调整形状为 [1, 1, h, w]，然后沿批量维度和帧数维度重复，使其形状变为 [b, n, h, w]。
+    # 获取二维坐标网格
     y = y.view(1, 1, h, w).repeat(b, n, 1, 1)
     x = x.view(1, 1, h, w).repeat(b, n, 1, 1)
 
-    coords = torch.stack([x, y, d], dim=2)
-    index = torch.arange(0, n, dtype=torch.float, **kwargs)
+    # 组合坐标与帧索引：
+    coords = torch.stack([x, y, d], dim=2) #将 x、y 和 d 堆叠在一起，形成形状为 [b, n, 3, h, w] 的张量 coords，其中 3 维表示 (x, y, d) 坐标。
+    # 生成帧索引：
+    index = torch.arange(0, n, dtype=torch.float, **kwargs)#使用 torch.arange 生成从 0 到 n-1 的一维张量 index。
+    # 将 index 调整形状为 [1, n, 1, 1, 1]，然后沿批量维度和空间维度重复，使其形状变为 [b, n, 1, h, w]。
     index = index.view(1, n, 1, 1, 1).repeat(b, 1, 1, h, w)
 
     return coords, index

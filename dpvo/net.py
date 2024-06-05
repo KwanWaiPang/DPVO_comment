@@ -109,46 +109,66 @@ class Patchifier(nn.Module):
         g = F.avg_pool2d(g, 4, 4)
         return g
 
+    # 用于从输入图像中提取特征块。
     def forward(self, images, patches_per_image=80, disps=None, gradient_bias=False, return_color=False):
         """ extract patches from input images """
-        fmap = self.fnet(images) / 4.0
-        imap = self.inet(images) / 4.0
 
+        # 进行特征提取（将提取的特征图缩放到四分之一大小。）
+        fmap = self.fnet(images) / 4.0 #通过fnet对输入图像进行特征提取，然后除以4.0，获取特征图 fmap
+        imap = self.inet(images) / 4.0 #通过inet对输入图像进行特征提取，然后除以4.0，获取内部特征图 imap
+
+        # 获取特征图的形状，分别是批次大小 b、图像数量 n、通道数 c、高度 h 和宽度 w。
         b, n, c, h, w = fmap.shape
 
         # bias patch selection towards regions with high gradient
-        if gradient_bias:
+        if gradient_bias:#参数传入为false
+            # 计算图像的梯度
             g = self.__image_gradient(images)
+
+            # 随机生成多个候选坐标 x 和 y。
             x = torch.randint(1, w-1, size=[n, 3*patches_per_image], device="cuda")
             y = torch.randint(1, h-1, size=[n, 3*patches_per_image], device="cuda")
+            # torch.randint 用于生成范围在 [1, w-1) 和 [1, h-1) 之间的随机整数。
+            # n 是图像的数量，patches_per_image 是每张图像的补丁数量。
 
+            # 将 x 和 y 坐标堆叠在一起形成一个新的张量 coords，其形状为 [n, 3*patches_per_image, 2]。
+            # dim=-1 表示在最后一个维度上堆叠，使得每个坐标对 (x, y) 成为二维坐标。
             coords = torch.stack([x, y], dim=-1).float()
+            # 根据坐标 coords 从梯度图 g 中提取patch。然后展平成一维张量。
             g = altcorr.patchify(g, coords, 0).view(-1)
             
-            ix = torch.argsort(g)
+            ix = torch.argsort(g)#进行梯度值的排序
+            # 提取梯度值最大的 patches_per_image 个坐标。
             x = x[:, ix[-patches_per_image:]]
             y = y[:, ix[-patches_per_image:]]
 
-        else:
+        else:#若为false，则直接随机生成坐标
             x = torch.randint(1, w-1, size=[n, patches_per_image], device="cuda")
             y = torch.randint(1, h-1, size=[n, patches_per_image], device="cuda")
         
-        coords = torch.stack([x, y], dim=-1).float()
+        coords = torch.stack([x, y], dim=-1).float() #patch的坐标
+        # 获取对应patch坐标的特征图
         imap = altcorr.patchify(imap[0], coords, 0).view(b, -1, DIM, 1, 1)
         gmap = altcorr.patchify(fmap[0], coords, 1).view(b, -1, 128, 3, 3)
 
-        if return_color:
+        #如果需要返回颜色信息，则从图像中提取对应的颜色特征块 clr（直接从图像提取，而前面的是从特征图中提取）。
+        if return_color: 
             clr = altcorr.patchify(images[0], 4*(coords + 0.5), 0).view(b, -1, 3)
 
+        # 如果未提供视差图，则创建一个全为1的视差图。
         if disps is None:
             disps = torch.ones(b, n, h, w, device="cuda")
 
+        # 坐标网格生成（用来表示每个像素在图像序列中的空间和时间位置。）
         grid, _ = coords_grid_with_index(disps, device=fmap.device)
+        # 从网格中提取特征块 patches。
         patches = altcorr.patchify(grid[0], coords, 1).view(b, -1, 3, 3, 3)
 
+        # 生成特征块的索引 index。（这个索引可以不用管，因为返回了也不用~~~）
         index = torch.arange(n, device="cuda").view(n, 1)
         index = index.repeat(1, patches_per_image).reshape(-1)
 
+        # 获取信息：从图像中提取特征图（fmap）、全局特征图（gmap）、内部特征图（imap）和图像块（patches），同时获取颜色信息（clr）
         if return_color:
             return fmap, gmap, imap, patches, index, clr
 
@@ -176,8 +196,8 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
     def __init__(self, use_viewer=False):
         super(VONet, self).__init__()
         self.P = 3  #patch size为3
-        self.patchify = Patchifier(self.P)
-        self.update = Update(self.P)
+        self.patchify = Patchifier(self.P)#Patchifier类的实例化对象，进行特征提取
+        self.update = Update(self.P)#Update类的实例化对象，进行更新操作
 
         self.DIM = DIM  #为384？？？
         self.RES = 4

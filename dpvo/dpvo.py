@@ -34,7 +34,7 @@ class DPVO:
         RES = self.RES
 
         ### state attributes ###
-        self.tlist = []
+        self.tlist = [] #一个列表，用于存储时间戳
         self.counter = 0
 
         # dummy image for visualization
@@ -43,7 +43,7 @@ class DPVO:
         self.tstamps_ = torch.zeros(self.N, dtype=torch.long, device="cuda")
         self.poses_ = torch.zeros(self.N, 7, dtype=torch.float, device="cuda")
         self.patches_ = torch.zeros(self.N, self.M, 3, self.P, self.P, dtype=torch.float, device="cuda")
-        self.intrinsics_ = torch.zeros(self.N, 4, dtype=torch.float, device="cuda")
+        self.intrinsics_ = torch.zeros(self.N, 4, dtype=torch.float, device="cuda") #内参
 
         self.points_ = torch.zeros(self.N * self.M, 3, dtype=torch.float, device="cuda")
         self.colors_ = torch.zeros(self.N, self.M, 3, dtype=torch.uint8, device="cuda")
@@ -322,7 +322,7 @@ class DPVO:
         return flatmeshgrid(torch.arange(t0, t1, device="cuda"),
             torch.arange(max(self.n-r, 0), self.n, device="cuda"), indexing='ij')
     
-    #开始迭代处理数据 
+    #开始迭代处理数据 （输入时间戳、图像、内参）
     def __call__(self, tstamp, image, intrinsics):
         """ track new frame """
 
@@ -331,72 +331,85 @@ class DPVO:
             self.viewer.update_image(image)
             self.viewer.loop()
 
+        # 归一化图像，将像素值从 [0, 255] 映射到 [-0.5, 1.5] 之间。
         image = 2 * (image[None,None] / 255.0) - 0.5
         
+        # 使用自动混合精度（autocast）加速计算。
+        # 用patchify进行特征提取，调用Patchifier的forward函数
+        # 获取信息：从图像中提取特征图（fmap）、全局特征图（gmap）、内部特征图（imap）和图像块（patches），同时获取颜色信息（clr）
         with autocast(enabled=self.cfg.MIXED_PRECISION):
             fmap, gmap, imap, patches, _, clr = \
                 self.network.patchify(image,
-                    patches_per_image=self.cfg.PATCHES_PER_FRAME, 
-                    gradient_bias=self.cfg.GRADIENT_BIAS, 
+                    patches_per_image=self.cfg.PATCHES_PER_FRAME, ##每一帧的patch数量
+                    gradient_bias=self.cfg.GRADIENT_BIAS, #是否考虑梯度的bias
                     return_color=True)
 
-        ### update state attributes ###
-        self.tlist.append(tstamp)
+        ### update state attributes （状态属性更新） ###
+        self.tlist.append(tstamp) #更新时间戳列表 
         self.tstamps_[self.n] = self.counter
         self.intrinsics_[self.n] = intrinsics / self.RES
 
-        # color info for visualization
+        # color info for visualization（可视化颜色信息）
+        # 调整颜色信息并存储在 self.colors_ 中。
         clr = (clr[0,:,[2,1,0]] + 0.5) * (255.0 / 2)
         self.colors_[self.n] = clr.to(torch.uint8)
 
+        # 索引更新
         self.index_[self.n + 1] = self.n + 1
-        self.index_map_[self.n + 1] = self.m + self.M
+        self.index_map_[self.n + 1] = self.m + self.M #地图索引
 
+        # 运动模型和姿态估计
         if self.n > 1:
+            # 如果运动模型为 'DAMPED_LINEAR'，则使用阻尼线性模型计算新姿态。
             if self.cfg.MOTION_MODEL == 'DAMPED_LINEAR':
+                # 转换姿态到 SE3 对象
                 P1 = SE3(self.poses_[self.n-1])
                 P2 = SE3(self.poses_[self.n-2])
                 
                 xi = self.cfg.MOTION_DAMPING * (P1 * P2.inv()).log()
                 tvec_qvec = (SE3.exp(xi) * P1).data
                 self.poses_[self.n] = tvec_qvec
-            else:
+            else:#否则的话，将姿态设置为上一帧的姿态。
                 tvec_qvec = self.poses[self.n-1]
                 self.poses_[self.n] = tvec_qvec
 
-        # TODO better depth initialization
-        patches[:,:,2] = torch.rand_like(patches[:,:,2,0,0,None,None])
-        if self.is_initialized:
+        # TODO better depth initialization（深度的初始化）
+        patches[:,:,2] = torch.rand_like(patches[:,:,2,0,0,None,None]) #初始化深度信息。
+        if self.is_initialized:#如果已初始化，则使用过去几帧的深度中值进行深度初始化。
             s = torch.median(self.patches_[self.n-3:self.n,:,2])
             patches[:,:,2] = s
 
         self.patches_[self.n] = patches
 
-        ### update network attributes ###
+        ### update network attributes 更新网络属性 ###
         self.imap_[self.n % self.mem] = imap.squeeze()
         self.gmap_[self.n % self.mem] = gmap.squeeze()
         self.fmap1_[:, self.n % self.mem] = F.avg_pool2d(fmap[0], 1, 1)
         self.fmap2_[:, self.n % self.mem] = F.avg_pool2d(fmap[0], 4, 4)
 
-        self.counter += 1        
+        # 计数器和初始化检查
+        self.counter += 1 #计数器加1       
+        # 检查是否初始化，如果未初始化且运动探测值小于 2.0，则更新 self.delta 并返回。
         if self.n > 0 and not self.is_initialized:
             if self.motion_probe() < 2.0:
                 self.delta[self.counter - 1] = (self.counter - 2, Id[0])
                 return
 
+        # 帧计数和关键帧处理
         self.n += 1
         self.m += self.M
 
-        # relative pose
+        # relative pose（添加前向和后向因子）
         self.append_factors(*self.__edges_forw())
         self.append_factors(*self.__edges_back())
 
+        # 如果帧数达到 8 并且未初始化，则进行初始化。
         if self.n == 8 and not self.is_initialized:
             self.is_initialized = True            
 
             for itr in range(12):
                 self.update()
-        
+        # 如果已初始化，则更新并处理关键帧。
         elif self.is_initialized:
             self.update()
             self.keyframe()
