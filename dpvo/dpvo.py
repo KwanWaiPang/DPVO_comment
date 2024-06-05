@@ -18,7 +18,7 @@ Id = SE3.Identity(1, device="cuda")
 class DPVO:
     def __init__(self, cfg, network, ht=480, wd=640, viz=False):
         self.cfg = cfg
-        self.load_weights(network)
+        self.load_weights(network)#从网络中加载权重
         self.is_initialized = False
         self.enable_timing = False
         
@@ -86,29 +86,35 @@ class DPVO:
         if viz:
             self.start_viewer()
 
+    # 加载权重（self:是该方法所属类的实例。）
     def load_weights(self, network):
-        # load network from checkpoint file
+        # load network from checkpoint file（如果 network 是一个字符串（即路径），则从文件中加载网络权重。）
         if isinstance(network, str):
             from collections import OrderedDict
-            state_dict = torch.load(network)
+            state_dict = torch.load(network) #采用torch.load函数加载权重文件
+            # 创建一个新的有序字典 new_state_dict。
             new_state_dict = OrderedDict()
+            # 遍历读取的state_dict键值对，如果键中不包含“update.lmbda”，则将其添加到new_state_dict中。
             for k, v in state_dict.items():
                 if "update.lmbda" not in k:
                     new_state_dict[k.replace('module.', '')] = v
             
+            # 创建新的VO网络
             self.network = VONet()
+            # 加载新的网络权重
             self.network.load_state_dict(new_state_dict)
 
         else:
             self.network = network
 
-        # steal network attributes
+        # steal network attributes（复制网络属性）
         self.DIM = self.network.DIM
         self.RES = self.network.RES
         self.P = self.network.P
 
-        self.network.cuda()
-        self.network.eval()
+        # 配置网络
+        self.network.cuda() #将网络移动到 GPU 上。
+        self.network.eval() #将网络设置为评估模式（即禁用 dropout 和 batch normalization 的训练行为）。
 
         # if self.cfg.MIXED_PRECISION:
         #     self.network.half()
@@ -314,7 +320,8 @@ class DPVO:
         t1 = self.M * max((self.n - 0), 0)
         return flatmeshgrid(torch.arange(t0, t1, device="cuda"),
             torch.arange(max(self.n-r, 0), self.n, device="cuda"), indexing='ij')
-
+    
+    #开始迭代处理数据 
     def __call__(self, tstamp, image, intrinsics):
         """ track new frame """
 

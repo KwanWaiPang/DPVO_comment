@@ -18,7 +18,7 @@
 
 <br>
 
-* 单纯运行demo，参数：矫正文档、数据路径、是否可视化，以及stride
+* 单纯运行demo，参数：矫正文档、数据路径、是否可视化，以及stride。同时需要下载权重模型
 ~~~
 python demo.py \
     --imagedir=<path to image directory or video> \

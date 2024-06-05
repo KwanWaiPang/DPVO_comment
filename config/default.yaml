@@ -1,4 +1,4 @@
-### DPVO Config File ###
+### DPVO Config File VO部分的配置文件 ###
 
 # VO config (increase for better accuracy)
 PATCHES_PER_FRAME: 96
