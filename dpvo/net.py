@@ -91,13 +91,15 @@ class Update(nn.Module):
 
         return net, (self.d(net), self.w(net), None)
 
-# 一个继承自 nn.Module 的类，负责将输入图像分割成小块（patch）并进行处理。
-class Patchifier(nn.Module):
+# 负责将输入图像分割成小块（patch）并进行处理。
+class Patchifier(nn.Module): #继承自 nn.Module 的类，表示一个神经网络模型。
     def __init__(self, patch_size=3):
-        super(Patchifier, self).__init__()
+        super(Patchifier, self).__init__() #继承父类的初始化函数
         self.patch_size = patch_size #patch_size为3（传入及默认的都为3）
         # 卷积网络的编码器。主要作用是对输入图像进行特征提取，经过多个卷积层和归一化层的处理，最后输出一个指定维度的特征图。
+        # fornt-net（输入均为image）
         self.fnet = BasicEncoder4(output_dim=128, norm_fn='instance') #输出维度为128，norm_fn为归一化形式（进行patch特征的提取）
+        # inner-net（输入均为image）
         self.inet = BasicEncoder4(output_dim=DIM, norm_fn='none')#输出维度为384（DIM）
     
     # 计算图像的梯度
@@ -146,10 +148,10 @@ class Patchifier(nn.Module):
             x = torch.randint(1, w-1, size=[n, patches_per_image], device="cuda")
             y = torch.randint(1, h-1, size=[n, patches_per_image], device="cuda")
         
-        coords = torch.stack([x, y], dim=-1).float() #patch的坐标
-        # 获取对应patch坐标的特征图
-        imap = altcorr.patchify(imap[0], coords, 0).view(b, -1, DIM, 1, 1)
-        gmap = altcorr.patchify(fmap[0], coords, 1).view(b, -1, 128, 3, 3)
+        coords = torch.stack([x, y], dim=-1).float() #patch的坐标（dim=-1 表示在最后一个维度上堆叠，使得每个坐标对 (x, y) 成为二维坐标。）
+        # 获取对应patch坐标的特征图（内部特征imap以及特征图 fmap）
+        imap = altcorr.patchify(imap[0], coords, 0).view(b, -1, DIM, 1, 1)#注意是覆盖的
+        gmap = altcorr.patchify(fmap[0], coords, 1).view(b, -1, 128, 3, 3)#注意是赋值
 
         #如果需要返回颜色信息，则从图像中提取对应的颜色特征块 clr（直接从图像提取，而前面的是从特征图中提取）。
         if return_color: 
@@ -168,7 +170,7 @@ class Patchifier(nn.Module):
         index = torch.arange(n, device="cuda").view(n, 1)
         index = index.repeat(1, patches_per_image).reshape(-1)
 
-        # 获取信息：从图像中提取特征图（fmap）、全局特征图（gmap）、内部特征图（imap）和图像块（patches），同时获取颜色信息（clr）
+        # 获取信息：从图像中提取特征图（fmap）、patch特征图（gmap）、patch内部特征图（imap）和图像块（patches），同时获取颜色信息（clr）
         if return_color:
             return fmap, gmap, imap, patches, index, clr
 
@@ -194,16 +196,17 @@ class CorrBlock:
 class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网络模型。
     # 初始化（构造）函数
     def __init__(self, use_viewer=False):
-        super(VONet, self).__init__()
+        super(VONet, self).__init__() #继承父类的初始化函数
         self.P = 3  #patch size为3
-        self.patchify = Patchifier(self.P)#Patchifier类的实例化对象，进行特征提取
-        self.update = Update(self.P)#Update类的实例化对象，进行更新操作
+        self.patchify = Patchifier(self.P)#创建一个Patchify block，进行特征提取
+        # Patchifier返回的包括：特征图fmap，patch特征图gmap，patch内部特征图imap，图像块patches，索引index（以及颜色信息clr)
+        self.update = Update(self.P)#创建一个Update block，进行更新操作
 
-        self.DIM = DIM  #为384？？？
+        self.DIM = DIM  #输出的特征维度为384
         self.RES = 4
 
 
-    @autocast(enabled=False)
+    @autocast(enabled=False) #用于控制自动混合精度（使用 GPU 进行训练时，AMP 可以帮助加速训练并减少显存使用量）
     def forward(self, images, poses, disps, intrinsics, M=1024, STEPS=12, P=1, structure_only=False, rescale=False):
         """ Estimates SE3 or Sim3 between pair of frames """
 

@@ -27,7 +27,7 @@ def run(cfg, network, imagedir, calib, stride=1, skip=0, viz=False, timeit=False
 
     # 读取数据集，根据数据集的类型，选择不同的读取方式（图片或视频）
     # 使用了 Python 的 multiprocessing 模块来创建一个新的进程，用于执行 image_stream 或video_stream函数。
-    # queue为获取的数据队列：t（索引？）, image, intrinsics
+    # queue为获取的数据队列：t（索引，仅最后一个为-1，用于判断是否结束）, image, intrinsics
     if os.path.isdir(imagedir):
         reader = Process(target=image_stream, args=(queue, imagedir, calib, stride, skip))
     else:
@@ -40,12 +40,12 @@ def run(cfg, network, imagedir, calib, stride=1, skip=0, viz=False, timeit=False
         (t, image, intrinsics) = queue.get()
         if t < 0: break #如果t小于0，跳出循环（最后一个数据输入了t=-1，代表着结束）
 
-        # 将图像数据从 NumPy 数组转换为 PyTorch 张量，并改变维度顺序（从 HWC 到 CHW）。
+        # 将图像数据从 NumPy 数组转换为 PyTorch 张量，并用permute（）改变维度顺序（从 HWC 到 CHW）。
         image = torch.from_numpy(image).permute(2,0,1).cuda()
         # 将内参数据从 NumPy 数组转换为 PyTorch 张量。
         intrinsics = torch.from_numpy(intrinsics).cuda()
 
-        # 初始化SLAM对象（DPVO），并传入配置对象 cfg、网络模型 network、图像的高度和宽度、是否可视化。等参数
+        # 初始化SLAM对象（DPVO），并传入配置参数cfg、网络权重模型network、图像的高度和宽度、是否可视化。等参数
         if slam is None:
             slam = DPVO(cfg, network, ht=image.shape[1], wd=image.shape[2], viz=viz)
 

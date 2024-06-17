@@ -32,3 +32,7 @@ python demo.py \
 ~~~
 python train.py --steps=240000 --lr=0.00008 --name=<your name>
 ~~~
+
+
+# 核心结构的解读笔记
+

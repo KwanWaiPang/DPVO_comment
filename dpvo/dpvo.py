@@ -90,10 +90,10 @@ class DPVO:
     # 加载权重（self:是该方法所属类的实例。）
     def load_weights(self, network):
         # load network from checkpoint file（如果 network 是一个字符串（即路径），则从文件中加载网络权重。）
-        if isinstance(network, str):
+        if isinstance(network, str):#  检查是否为字符串类型
             from collections import OrderedDict
             state_dict = torch.load(network) #采用torch.load函数加载权重文件
-            # 创建一个新的有序字典 new_state_dict。
+            # 创建一个新的有序字典 （保证按输入的顺序）new_state_dict。
             new_state_dict = OrderedDict()
             # 遍历读取的state_dict键值对，如果键中不包含“update.lmbda”，则将其添加到new_state_dict中。
             for k, v in state_dict.items():
