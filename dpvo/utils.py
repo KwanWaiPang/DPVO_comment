@@ -91,6 +91,7 @@ def set_depth(patches, depth):
     return patches
 
 def flatmeshgrid(*args, **kwargs):
+    # 生成网格坐标，参数对应网格的坐标
     grid = torch.meshgrid(*args, **kwargs)
-    return (x.reshape(-1) for x in grid)
+    return (x.reshape(-1) for x in grid) #将网格中的每个张量展平为一维张量。
 

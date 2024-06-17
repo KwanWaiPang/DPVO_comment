@@ -24,25 +24,33 @@ import matplotlib.pyplot as plt
 
 DIM = 384
 
+# update operator，是一个Recurrent网络
 class Update(nn.Module):
+    # 初始化函数（输入patch size）
     def __init__(self, p):
+        # 调用了父类 nn.Module 的构造函数，确保父类中的初始化操作也得以执行。
         super(Update, self).__init__()
 
+        # 全链接层，输入维度为DIM，输出维度为DIM
+        # 每个序列包含两个线性层和一个 ReLU 激活函数。
         self.c1 = nn.Sequential(
             nn.Linear(DIM, DIM),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=True),#，inplace=True 表示直接在输入上进行操作以节省内存。
             nn.Linear(DIM, DIM))
 
         self.c2 = nn.Sequential(
             nn.Linear(DIM, DIM),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=True),#，inplace=True 表示直接在输入上进行操作以节省内存。
             nn.Linear(DIM, DIM))
         
-        self.norm = nn.LayerNorm(DIM, eps=1e-3)
+        # 层归一化层，标准化输入以改善训练的稳定性。
+        self.norm = nn.LayerNorm(DIM, eps=1e-3) #eps=1e-3：一个小值，用于避免除零错误。
 
+        # softMax aggregation(文献：Superglue，做learning的特征点匹配中出现类似结构)
         self.agg_kk = SoftAgg(DIM)
         self.agg_ij = SoftAgg(DIM)
 
+        # 包含两个层归一化层和两个GatedResidual模块。
         self.gru = nn.Sequential(
             nn.LayerNorm(DIM, eps=1e-3),
             GatedResidual(DIM),
@@ -50,6 +58,7 @@ class Update(nn.Module):
             GatedResidual(DIM),
         )
 
+        # 全连接层序列，输入维度为 2*49*p*p，输出维度为 DIM，包含3个全连接层，2 ReLU 激活函数和1层归一化。
         self.corr = nn.Sequential(
             nn.Linear(2*49*p*p, DIM),
             nn.ReLU(inplace=True),
@@ -59,16 +68,18 @@ class Update(nn.Module):
             nn.Linear(DIM, DIM),
         )
 
+        # 全连接层序列，包含自定义模块GradientClip。
         self.d = nn.Sequential(
             nn.ReLU(inplace=False),
             nn.Linear(DIM, 2),
             GradientClip())
 
+        # 全连接层序列，包含自定义模块GradientClip。
         self.w = nn.Sequential(
             nn.ReLU(inplace=False),
             nn.Linear(DIM, 2),
             GradientClip(),
-            nn.Sigmoid())
+            nn.Sigmoid()) #最后包含一个 Sigmoid 激活函数，将输出压缩到 [0, 1] 范围。
 
 
     def forward(self, net, inp, corr, flow, ii, jj, kk):
@@ -176,21 +187,23 @@ class Patchifier(nn.Module): #继承自 nn.Module 的类，表示一个神经网
 
         return fmap, gmap, imap, patches, index
 
-
+# 计算图像块（patch特征图gmap）与特征图fmap之间的相关性
 class CorrBlock:
     def __init__(self, fmap, gmap, radius=3, dropout=0.2, levels=[1,4]):
         self.dropout = dropout
         self.radius = radius
         self.levels = levels
 
-        self.gmap = gmap
-        self.pyramid = pyramidify(fmap, lvls=levels)
+        self.gmap = gmap #patch特征图
+        self.pyramid = pyramidify(fmap, lvls=levels) #将特征图转换为金字塔形式
 
     def __call__(self, ii, jj, coords):
         corrs = []
+        # 遍历每个金字塔层次 levels（默认应该是1~4）。每层再调用 altcorr.corr 函数计算图像块之间的相关性。
         for i in range(len(self.levels)):
+            # 将每层次的相关性结果存入 corrs 列表。
             corrs += [ altcorr.corr(self.gmap, self.pyramid[i], coords / self.levels[i], ii, jj, self.radius, self.dropout) ]
-        return torch.stack(corrs, -1).view(1, len(ii), -1)
+        return torch.stack(corrs, -1).view(1, len(ii), -1) #将所有层次的相关性结果堆叠并调整形状返回。
 
 # 定义的VO网络
 class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网络模型。
@@ -210,27 +223,31 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
     def forward(self, images, poses, disps, intrinsics, M=1024, STEPS=12, P=1, structure_only=False, rescale=False):
         """ Estimates SE3 or Sim3 between pair of frames """
 
-        images = 2 * (images / 255.0) - 0.5
-        intrinsics = intrinsics / 4.0
-        disps = disps[:, :, 1::4, 1::4].float()
+        images = 2 * (images / 255.0) - 0.5 #将图像数据归一化到 [-0.5, 1.5] 范围内。
+        intrinsics = intrinsics / 4.0 #将内参数据除以4.0，缩放到四分之一大小。
+        disps = disps[:, :, 1::4, 1::4].float() #将视差图的高度和宽度缩小四倍。，视差图记录深度值
 
+        # Patchifier返回的包括：特征图fmap，patch特征图gmap，patch内部特征图imap，图像块patches，patch的索引index
         fmap, gmap, imap, patches, ix = self.patchify(images, disps=disps)
 
+        # 通过 CorrBlock 类计算图像块之间的相关性。具体地是计算 patch 特征图 gmap 和特征图 fmap 之间的相关性。
         corr_fn = CorrBlock(fmap, gmap)
 
-        b, N, c, h, w = fmap.shape
-        p = self.P
+        b, N, c, h, w = fmap.shape #获取特征图的形状，分别是批次大小 b、图像数量 n、通道数 c、高度 h 和宽度 w。
+        p = self.P #patch size
 
-        patches_gt = patches.clone()
-        Ps = poses
+        patches_gt = patches.clone() #克隆patches，patches_gt为patches的克隆
+        Ps = poses #相机位姿
 
-        d = patches[..., 2, p//2, p//2]
-        patches = set_depth(patches, torch.rand_like(d))
+        d = patches[..., 2, p//2, p//2]#获取patches的第二个通道的中心像素值
+        patches = set_depth(patches, torch.rand_like(d))#设置patches的深度值，随机初始化
 
+        # 生成一维的网格索引
+        # torch.where(ix < 8)[0]：这个操作会返回满足条件 ix < 8 的索引。torch.arange(0, 8, device="cuda")：生成从 0 到 7 的张量，并放置在 GPU 上
         kk, jj = flatmeshgrid(torch.where(ix < 8)[0], torch.arange(0,8, device="cuda"))
         ii = ix[kk]
 
-        imap = imap.view(b, -1, DIM)
+        imap = imap.view(b, -1, DIM) #将 imap 的形状重塑为 (b, -1, DIM
         net = torch.zeros(b, len(kk), DIM, device="cuda", dtype=torch.float)
         
         Gs = SE3.IdentityLike(poses)
@@ -242,6 +259,7 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
         bounds = [-64, -64, w + 64, h + 64]
         
         while len(traj) < STEPS:
+            # 分离梯度，避免梯度累积
             Gs = Gs.detach()
             patches = patches.detach()
 
