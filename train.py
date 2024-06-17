@@ -1,6 +1,6 @@
 import cv2
 import os
-import argparse
+import argparse #导入argparse模块，该模块用于解析命令行参数
 import numpy as np
 from collections import OrderedDict
 
@@ -155,9 +155,11 @@ def train(args):
                 torch.cuda.empty_cache()
                 net.train()
 
-
+# 主函数
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser() #创建一个ArgumentParser对象，parser。这个对象包含将要添加的所有命令行参数及其处理方式。
+    
+    # 添加命令行参数，第一个指定了参数的名称，default指定了参数的默认值; help指定了参数的帮助信息；type指定了参数的类型
     parser.add_argument('--name', default='bla', help='name your experiment')
     parser.add_argument('--ckpt', help='checkpoint to restore')
     parser.add_argument('--steps', type=int, default=240000)
@@ -166,6 +168,8 @@ if __name__ == '__main__':
     parser.add_argument('--n_frames', type=int, default=15)
     parser.add_argument('--pose_weight', type=float, default=10.0)
     parser.add_argument('--flow_weight', type=float, default=0.1)
+
+    # 解析命令行参数并将结果赋值给args。
     args = parser.parse_args()
 
     train(args)

@@ -4,11 +4,12 @@ import glob
 import os.path as osp
 import os
 import torch
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue #导入多进程模块，进行多线程处理
 
+# 导入自定义模块（下面是dpvo自己定义的模块）
 from dpvo.utils import Timer
 from dpvo.dpvo import DPVO
-from dpvo.config import cfg
+from dpvo.config import cfg #应该就是配置文件对应的对象
 from dpvo.stream import image_stream, video_stream
 
 SKIP = 0
@@ -18,13 +19,15 @@ def show_image(image, t=0):
     cv2.imshow('image', image / 255.0)
     cv2.waitKey(t)
 
-@torch.no_grad() #装饰器，表示该函数不会计算梯度
+@torch.no_grad() #表示该函数不会计算梯度（由于是导入网络权重的）
 def run(cfg, network, imagedir, calib, stride=1, skip=0, viz=False, timeit=False):
 
     slam = None #初始化slam为空
     queue = Queue(maxsize=8) #创建一个队列，队列的最大长度为8，应该是用于多线程操作？
 
     # 读取数据集，根据数据集的类型，选择不同的读取方式（图片或视频）
+    # 使用了 Python 的 multiprocessing 模块来创建一个新的进程，用于执行 image_stream 或video_stream函数。
+    # queue为获取的数据队列：t（索引？）, image, intrinsics
     if os.path.isdir(imagedir):
         reader = Process(target=image_stream, args=(queue, imagedir, calib, stride, skip))
     else:
@@ -35,7 +38,7 @@ def run(cfg, network, imagedir, calib, stride=1, skip=0, viz=False, timeit=False
     while 1:
         # 从队列中获取数据
         (t, image, intrinsics) = queue.get()
-        if t < 0: break #如果t小于0，跳出循环
+        if t < 0: break #如果t小于0，跳出循环（最后一个数据输入了t=-1，代表着结束）
 
         # 将图像数据从 NumPy 数组转换为 PyTorch 张量，并改变维度顺序（从 HWC 到 CHW）。
         image = torch.from_numpy(image).permute(2,0,1).cuda()
@@ -69,11 +72,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # 添加命令行参数以及其默认值
-    parser.add_argument('--network', type=str, default='dpvo.pth') # 网络模型
+    parser.add_argument('--network', type=str, default='dpvo.pth') # 预训练的网络模型
     parser.add_argument('--imagedir', type=str) #数据集路径
     parser.add_argument('--calib', type=str) #相机内参，校准参数
-    parser.add_argument('--stride', type=int, default=2)
-    parser.add_argument('--skip', type=int, default=0)
+    parser.add_argument('--stride', type=int, default=2) #取数据的步长
+    parser.add_argument('--skip', type=int, default=0) #取数据的时候跳过的帧数（跳过前面几帧）
     parser.add_argument('--config', default="config/default.yaml") #VO配置文件
     parser.add_argument('--timeit', action='store_true') #如果命令行中包含这个参数，为True，否则为False。
     parser.add_argument('--viz', action="store_true") #如果命令行中包含这个参数，为True，否则为False。

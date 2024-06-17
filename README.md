@@ -19,6 +19,7 @@
 <br>
 
 * 单纯运行demo，参数：矫正文档、数据路径、是否可视化，以及stride。同时需要下载权重模型
+* 如果应用仅局限于已有的权重模型，那么就看demo.py
 ~~~
 python demo.py \
     --imagedir=<path to image directory or video> \
