@@ -36,3 +36,11 @@ python train.py --steps=240000 --lr=0.00008 --name=<your name>
 
 # 核心结构的解读笔记
 
+<p align="center">
+  <img width="90%" src="image\Patchifier.png">
+</p>
+
+<p align="center">
+  <img width="90%" src="image\update.png">
+</p>
+
