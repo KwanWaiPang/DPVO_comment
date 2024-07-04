@@ -237,7 +237,7 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
         p = self.P #patch size
 
         patches_gt = patches.clone() #克隆patches，patches_gt为patches的克隆
-        Ps = poses #相机位姿
+        Ps = poses #相机位姿，GT pose（应该是xyz，qw，qx，qy，qz）
 
         d = patches[..., 2, p//2, p//2]#获取patches的第二个通道的中心像素值
         patches = set_depth(patches, torch.rand_like(d))#设置patches的深度值，随机初始化
@@ -250,7 +250,7 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
         imap = imap.view(b, -1, DIM) #将 imap 的形状重塑为 (b, -1, DIM
         net = torch.zeros(b, len(kk), DIM, device="cuda", dtype=torch.float)
         
-        Gs = SE3.IdentityLike(poses)
+        Gs = SE3.IdentityLike(poses)#将其转换为 SE3 对象，然后调用 IdentityLike 函数，生成一个与 poses 相同形状的单位矩阵。
 
         if structure_only:
             Gs.data[:] = poses.data[:]
@@ -297,6 +297,7 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
 
             ep = 10
             for itr in range(2):
+                # 通过BA优化来计算pose，Gs
                 Gs, patches = BA(Gs, patches, intrinsics, target, weight, lmbda, ii, jj, kk, 
                     bounds, ep=ep, fixedp=1, structure_only=structure_only)
 
@@ -304,10 +305,12 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
             dij = (ii - jj).abs()
             k = (dij > 0) & (dij <= 2)
 
+            # 用估算的pose进行变换
             coords = pops.transform(Gs, patches, intrinsics, ii[k], jj[k], kk[k])
+            # 用真值的pose进行变换
             coords_gt, valid, _ = pops.transform(Ps, patches_gt, intrinsics, ii[k], jj[k], kk[k], jacobian=True)
 
-            traj.append((valid, coords, coords_gt, Gs[:,:n], Ps[:,:n], kl))
+            traj.append((valid, coords, coords_gt, Gs[:,:n], Ps[:,:n], kl))#GS为estimate的结果，PS才是真值
 
         return traj
 

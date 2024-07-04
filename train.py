@@ -48,7 +48,7 @@ def train(args):
     rank = 0
 
     db = dataset_factory(['tartan'], datapath="datasets/TartanAir", n_frames=args.n_frames)
-    train_loader = DataLoader(db, batch_size=1, shuffle=True, num_workers=4)
+    train_loader = DataLoader(db, batch_size=1, shuffle=True, num_workers=4)#读入数据
 
     net = VONet()
     net.train()
@@ -73,13 +73,13 @@ def train(args):
 
     while 1:
         for data_blob in train_loader:
-            images, poses, disps, intrinsics = [x.cuda().float() for x in data_blob]
+            images, poses, disps, intrinsics = [x.cuda().float() for x in data_blob]#pose位真值
             optimizer.zero_grad()
 
             # fix poses to gt for first 1k steps
             so = total_steps < 1000 and args.ckpt is None
 
-            poses = SE3(poses).inv()
+            poses = SE3(poses).inv() #将pose转换为SE3对象，然后求逆
             traj = net(images, poses, disps, intrinsics, M=1024, STEPS=18, structure_only=so)
 
             loss = 0.0
@@ -105,9 +105,11 @@ def train(args):
                 s = kabsch_umeyama(t2[0], t1[0]).detach().clamp(max=10.0)
                 P1 = P1.scale(s.view(1, 1))
 
+                # 得到相对位姿
                 dP = P1[:,ii].inv() * P1[:,jj]
                 dG = P2[:,ii].inv() * P2[:,jj]
 
+                # 计算相对位姿的误差，但这是在xyz，qwqxqyqz的空间，不是在李代数空间
                 e1 = (dP * dG.inv()).log()
                 tr = e1[...,0:3].norm(dim=-1)
                 ro = e1[...,3:6].norm(dim=-1)

@@ -269,7 +269,7 @@ class SE3(LieGroup):
     manifold_dim = 6
     embedded_dim = 7
 
-    # translation, unit quaternion
+    # translation, unit quaternion（单位四元数）
     id_elem = torch.as_tensor([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
 
     def __init__(self, data):
@@ -280,7 +280,7 @@ class SE3(LieGroup):
         super(SE3, self).__init__(data)
 
     def scale(self, s):
-        t, q = self.data.split([3,4], -1)
+        t, q = self.data.split([3,4], -1)#将data按照最后一个维度分割成两个张量，分别是t和q
         t = t * s.unsqueeze(-1)
         return SE3(torch.cat([t, q], dim=-1))
 
