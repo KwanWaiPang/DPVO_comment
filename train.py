@@ -110,7 +110,7 @@ def train(args):
                 dG = P2[:,ii].inv() * P2[:,jj]
 
                 # 计算相对位姿的误差，但这是在xyz，qwqxqyqz的空间，不是在李代数空间
-                e1 = (dP * dG.inv()).log()
+                e1 = (dP * dG.inv()).log()#但是 # 注意此处log已经从李代数转换到欧拉角
                 tr = e1[...,0:3].norm(dim=-1)
                 ro = e1[...,3:6].norm(dim=-1)
 
