@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 # 创建一个ResidualBlock类，继承自nn.Module
 class ResidualBlock(nn.Module):
+    #self.in_planes应该是32，dim（planes）也是32
     # 输入参数：in_planes（输入通道数）、planes（输出通道数）、norm_fn（归一化层的类型，默认为'group'）、stride（步幅，默认为1）
     def __init__(self, in_planes, planes, norm_fn='group', stride=1):
         super(ResidualBlock, self).__init__()
@@ -217,6 +218,7 @@ class BasicEncoder4(nn.Module): #继承自 nn.Module
             self.norm1 = nn.Sequential() #使用一个空的 Sequential 容器，相当于不使用归一化。
 
         # 第一个卷积层及激活函数（输入通道数为 3，输出通道数为 DIM，卷积核大小为 7，步幅为 2，填充为 3。）
+        # 此处DIM为32
         self.conv1 = nn.Conv2d(3, DIM, kernel_size=7, stride=2, padding=3)
         self.relu1 = nn.ReLU(inplace=True) #第一个 ReLU 激活函数，使用 inplace=True 以节省内存
 
@@ -248,7 +250,7 @@ class BasicEncoder4(nn.Module): #继承自 nn.Module
                     nn.init.constant_(m.bias, 0)
 
     def _make_layer(self, dim, stride=1):
-        layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride)
+        layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride) #self.in_planes应该是32，dim也是32
         layer2 = ResidualBlock(dim, dim, self.norm_fn, stride=1)
         layers = (layer1, layer2) # layer1 和 layer2 组合成一个元组 layers。
         
