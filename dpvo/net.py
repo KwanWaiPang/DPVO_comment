@@ -127,8 +127,8 @@ class Patchifier(nn.Module): #继承自 nn.Module 的类，表示一个神经网
         """ extract patches from input images """
 
         # 进行特征提取（将提取的特征图缩放到四分之一大小。）
-        fmap = self.fnet(images) / 4.0 #通过fnet对输入图像进行特征提取，然后除以4.0，获取特征图 fmap
-        imap = self.inet(images) / 4.0 #通过inet对输入图像进行特征提取，然后除以4.0，获取内部特征图 imap
+        fmap = self.fnet(images) / 4.0 #通过fnet对输入图像进行特征提取，然后除以4.0，获取特征图 fmap（matching feature）
+        imap = self.inet(images) / 4.0 #通过inet对输入图像进行特征提取，然后除以4.0，获取内部特征图 imap （context feature）
 
         # 获取特征图的形状，分别是批次大小 b、图像数量 n、通道数 c、高度 h 和宽度 w。
         b, n, c, h, w = fmap.shape
@@ -181,7 +181,7 @@ class Patchifier(nn.Module): #继承自 nn.Module 的类，表示一个神经网
         index = torch.arange(n, device="cuda").view(n, 1)
         index = index.repeat(1, patches_per_image).reshape(-1)
 
-        # 获取信息：从图像中提取特征图（fmap）、patch特征图（gmap）、patch内部特征图（imap）和图像块（patches），同时获取颜色信息（clr）
+        # 获取信息：image对应的fmap（matching feature）、patch特征图gmap（matching feature）、patch对应的imap （context feature）和图像块（patches），同时获取颜色信息（clr）
         if return_color:
             return fmap, gmap, imap, patches, index, clr
 
@@ -229,6 +229,7 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
 
         # Patchifier返回的包括：特征图fmap，patch特征图gmap，patch内部特征图imap，图像块patches，patch的索引index
         fmap, gmap, imap, patches, ix = self.patchify(images, disps=disps)
+        # image对应的fmap（matching feature）、patch特征图gmap（matching feature）、patch对应的imap （context feature）
 
         # 通过 CorrBlock 类计算图像块之间的相关性。具体地是计算 patch 特征图 gmap 和特征图 fmap 之间的相关性。
         corr_fn = CorrBlock(fmap, gmap)
@@ -290,6 +291,8 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
             coords1 = coords.permute(0, 1, 4, 2, 3).contiguous()
 
             corr = corr_fn(kk, jj, coords1)
+            
+            # update的时候会返回delta可用于后续的计算
             net, (delta, weight, _) = self.update(net, imap[:,kk], corr, None, ii, jj, kk)
 
             lmbda = 1e-4
