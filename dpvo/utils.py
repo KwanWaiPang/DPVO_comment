@@ -70,14 +70,19 @@ def patchify(x, patch_size=3):
     return y.reshape(b, -1, c, patch_size, patch_size)
 
 
-def pyramidify(fmap, lvls=[1]):
+def pyramidify(fmap, lvls=[1]):#输入的lvls为[1,4]，fmap是H/4*W/4的matching feature
     """ turn fmap into a pyramid """
-    b, n, c, h, w = fmap.shape
+    b, n, c, h, w = fmap.shape #解fmap 的形状。
 
-    pyramid = []
+    pyramid = [] #初始化一个空列表，用于存储金字塔的每一层。
     for lvl in lvls:
-        gmap =  F.avg_pool2d(fmap.view(b*n, c, h, w), lvl, stride=lvl)
+        # 将 fmap 重新形状为 (b*n, c, h, w)，然后使用平均池化操作进行下采样。池化核大小和步长均为 lvl。
+        gmap =  F.avg_pool2d(fmap.view(b*n, c, h, w), lvl, stride=lvl) 
+        # 将池化后的特征图重新形状为 (b, n, c, h//lvl, w//lvl)，并添加到 pyramid 列表中。
         pyramid += [ gmap.view(b, n, c, h//lvl, w//lvl) ]
+    
+    #对于 lvl = 1：池化后尺寸不变。即将 fmap 重新形状为 (b, n, c, h/4, w/4)，并添加到 pyramid 列表中。
+    # 对于 lvl = 4：池化后尺寸为原来的 1/4。即 (b, n, c, H/16, W/16)。
         
     return pyramid
 

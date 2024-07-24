@@ -192,7 +192,7 @@ class CorrBlock:
     def __init__(self, fmap, gmap, radius=3, dropout=0.2, levels=[1,4]):
         self.dropout = dropout
         self.radius = radius
-        self.levels = levels
+        self.levels = levels #[1,4]
 
         self.gmap = gmap #patch特征图
         self.pyramid = pyramidify(fmap, lvls=levels) #将特征图转换为金字塔形式
