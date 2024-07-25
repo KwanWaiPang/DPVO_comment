@@ -48,7 +48,7 @@ class PatchLayer(torch.autograd.Function):
 
         return grad, None, None
 
-# 从输入张量 net（梯度图） 中提取图像patches。如果指定了 mode='bilinear'，函数会对这些patches进行双线性插值。
+# 从输入张量 net（为feature map） 中提取图像patches。如果指定了 mode='bilinear'，函数会对这些patches进行双线性插值。
 def patchify(net, coords, radius, mode='bilinear'):
     """ extract patches """
     

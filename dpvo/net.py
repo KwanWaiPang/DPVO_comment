@@ -164,9 +164,13 @@ class Patchifier(nn.Module): #继承自 nn.Module 的类，表示一个神经网
             y = torch.randint(1, h-1, size=[n, patches_per_image], device="cuda")
         
         coords = torch.stack([x, y], dim=-1).float() #patch的坐标（dim=-1 表示在最后一个维度上堆叠，使得每个坐标对 (x, y) 成为二维坐标。）
-        # 获取对应patch坐标的特征图（内部特征imap以及特征图 fmap）
-        imap = altcorr.patchify(imap[0], coords, 0).view(b, -1, DIM, 1, 1)#注意是覆盖的
-        gmap = altcorr.patchify(fmap[0], coords, 1).view(b, -1, 128, 3, 3)#注意是赋值
+        # 获取对应patch坐标的特征图
+        # gmap为 patch的matching feature
+        # imap为 patch的context feature
+        # fmap为 image/frame的的matching feature
+        # view的作用是将张量重塑为指定形状
+        imap = altcorr.patchify(imap[0], coords, 0).view(b, -1, DIM, 1, 1)#注意形状为384*1*1（相当于只关注中心点的context feature）
+        gmap = altcorr.patchify(fmap[0], coords, 1).view(b, -1, 128, 3, 3)#注意形状为128*3*3（p=3）
 
         #如果需要返回颜色信息，则从图像中提取对应的颜色特征块 clr（直接从图像提取，而前面的是从特征图中提取）。
         if return_color: 
