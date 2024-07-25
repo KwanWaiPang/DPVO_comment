@@ -58,7 +58,8 @@ class Update(nn.Module):
             GatedResidual(DIM),
         )
 
-        # 全连接层序列，输入维度为 2*49*p*p，输出维度为 DIM，包含3个全连接层，2 ReLU 激活函数和1层归一化。
+        # 全连接层序列（用于处理correlation matching feature，将其转换为384）
+        # 输入维度为 2*49*p*p，输出维度为 DIM，包含3个全连接层，2 ReLU 激活函数和1层归一化。
         self.corr = nn.Sequential(
             nn.Linear(2*49*p*p, DIM),
             nn.ReLU(inplace=True),
@@ -84,6 +85,9 @@ class Update(nn.Module):
 
     def forward(self, net, inp, corr, flow, ii, jj, kk):
         """ update operator """
+        # corr应该是correlation matching feature？
+        # imap应该是patch的context feature
+        # 那么net应该就是hidden state？
 
         net = net + inp + self.corr(corr)
         net = self.norm(net)
@@ -246,9 +250,9 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
         # 生成一维的网格索引
         # torch.where(ix < 8)[0]：这个操作会返回满足条件 ix < 8 的索引。torch.arange(0, 8, device="cuda")：生成从 0 到 7 的张量，并放置在 GPU 上
         kk, jj = flatmeshgrid(torch.where(ix < 8)[0], torch.arange(0,8, device="cuda"))
-        ii = ix[kk]
+        ii = ix[kk]#kk应该是指patch的索引
 
-        imap = imap.view(b, -1, DIM) #将 imap 的形状重塑为 (b, -1, DIM
+        imap = imap.view(b, -1, DIM) #将patch的context feature imap 的形状重塑为 (b, -1, DIM
         net = torch.zeros(b, len(kk), DIM, device="cuda", dtype=torch.float)
         
         Gs = SE3.IdentityLike(poses)#将其转换为 SE3 对象，然后调用 IdentityLike 函数，生成一个与 poses 相同形状的单位矩阵。
@@ -292,7 +296,10 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
 
             corr = corr_fn(kk, jj, coords1)
             
-            # update的时候会返回delta可用于后续的计算
+            # update的时候会返回delta可用于后续的计算(进行RNN的update操作)
+            # corr应该是correlation matching feature？
+            # imap应该是patch的context feature
+            # 那么net应该就是hidden state？
             net, (delta, weight, _) = self.update(net, imap[:,kk], corr, None, ii, jj, kk)
 
             lmbda = 1e-4
