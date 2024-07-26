@@ -28,7 +28,7 @@ class GatedResidual(nn.Module):
     def forward(self, x):
         return x + self.gate(x) * self.res(x)
 
-class SoftAgg(nn.Module):#继承自 nn.Module
+class SoftAgg(nn.Module):#继承自 nn.Module（用于实现一种基于索引的特征聚合机制）
     def __init__(self, dim=512, expand=True):#输出参数为特征维度dim=512，expand=True（决定是否在最后返回时扩展结果）
         super(SoftAgg, self).__init__()
         self.dim = dim
@@ -38,11 +38,11 @@ class SoftAgg(nn.Module):#继承自 nn.Module
         self.g = nn.Linear(self.dim, self.dim)
         self.h = nn.Linear(self.dim, self.dim)
 
-    def forward(self, x, ix):#输入为patch特征，以及patch的索引
+    def forward(self, x, ix):#输入的为特征图x和特征图的索引ix
         # unique是去重函数，返回去重后的值和索引，jx为去重后的索引，进而可以知道特征图中，哪些特征是同一个patch的
-        _, jx = torch.unique(ix, return_inverse=True)
+        _, jx = torch.unique(ix, return_inverse=True)#获取哪些特征属于同一个patch
         #根据去重的索引jx， 用torch_scatter操作，计算相同索引的加权特征
-        w = torch_scatter.scatter_softmax(self.g(x), jx, dim=1)
+        w = torch_scatter.scatter_softmax(self.g(x), jx, dim=1)#将特征图x在第1维度上按照索引jx进行softmax操作
         # 计算聚合特征
         y = torch_scatter.scatter_sum(self.f(x) * w, jx, dim=1)
 

@@ -50,7 +50,7 @@ class Update(nn.Module):
         self.agg_kk = SoftAgg(DIM)
         self.agg_ij = SoftAgg(DIM)
 
-        # 包含两个层归一化层和两个GatedResidual模块。
+        # 包含两个层归一化层和两个GatedResidual模块。（用于做transition block处理）
         self.gru = nn.Sequential(
             nn.LayerNorm(DIM, eps=1e-3),
             GatedResidual(DIM),
@@ -75,7 +75,7 @@ class Update(nn.Module):
             nn.Linear(DIM, 2),
             GradientClip())
 
-        # 全连接层序列，包含自定义模块GradientClip。
+        # 全连接层序列，包含自定义模块GradientClip。相当于权重？
         self.w = nn.Sequential(
             nn.ReLU(inplace=False),
             nn.Linear(DIM, 2),
@@ -88,20 +88,27 @@ class Update(nn.Module):
         # corr应该是correlation matching feature？
         # imap应该是patch的context feature
         # 那么net应该就是hidden state？
+        # 传入的为(net, imap[:,kk], corr, None, ii, jj, kk)
+        # ii是关键帧k patch对应的时间。j为重投映的时间。kk是关键帧列表？
 
-        net = net + inp + self.corr(corr)
-        net = self.norm(net)
+        net = net + inp + self.corr(corr)#self.corr处理correlation matching feature，将其转换为384
+        net = self.norm(net) #归一化层
 
-        ix, jx = fastba.neighbors(kk, jj)
+        ix, jx = fastba.neighbors(kk, jj)#获取邻居索引
         mask_ix = (ix >= 0).float().reshape(1, -1, 1)
         mask_jx = (jx >= 0).float().reshape(1, -1, 1)
 
+        # 进行1D卷积操作
+        # net的size是b, len(kk), DIM,
         net = net + self.c1(mask_ix * net[:,ix])
         net = net + self.c2(mask_jx * net[:,jx])
 
-        net = net + self.agg_kk(net, kk)
-        net = net + self.agg_ij(net, ii*12345 + jj)
+        # 基于索引的特征聚合
+        net = net + self.agg_kk(net, kk) #这代表的应该是同一个patch在不同时间戳的聚合
+        net = net + self.agg_ij(net, ii*12345 + jj) #这代表的应该是两个时间戳，不同的patch的聚合
+        # 乘以 12345 是为了确保 ii 和 jj 的组合是唯一的，不会产生冲突？？？？
 
+        # 做transition block处理
         net = self.gru(net)
 
         return net, (self.d(net), self.w(net), None)
@@ -254,10 +261,11 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
         # 生成一维的网格索引
         # torch.where(ix < 8)[0]：这个操作会返回满足条件 ix < 8 的索引。torch.arange(0, 8, device="cuda")：生成从 0 到 7 的张量，并放置在 GPU 上
         kk, jj = flatmeshgrid(torch.where(ix < 8)[0], torch.arange(0,8, device="cuda"))
-        ii = ix[kk]#kk应该是指patch的索引
+        ii = ix[kk]#kk应该是指当前patch的索引
 
         imap = imap.view(b, -1, DIM) #将patch的context feature imap 的形状重塑为 (b, -1, DIM
         net = torch.zeros(b, len(kk), DIM, device="cuda", dtype=torch.float)
+        # net的size为b, len(kk), DIM。kk是patch的索引（所有的关键帧），DIM是特征维度。
         
         Gs = SE3.IdentityLike(poses)#将其转换为 SE3 对象，然后调用 IdentityLike 函数，生成一个与 poses 相同形状的单位矩阵。
 
