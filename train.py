@@ -84,6 +84,8 @@ def train(args):
 
             loss = 0.0
             for i, (v, x, y, P1, P2, kl) in enumerate(traj):
+                # (valid, coords, coords_gt, Gs[:,:n], Ps[:,:n], kl))#GS为estimate的结果，PS才是真值
+                # 返回的P1为真值，P2为估计值
                 e = (x - y).norm(dim=-1)
                 e = e.reshape(-1, 9)[(v > 0.5).reshape(-1)].min(dim=-1).values
 
@@ -102,6 +104,7 @@ def train(args):
                 t1 = P1.matrix()[...,:3,3]
                 t2 = P2.matrix()[...,:3,3]
 
+                # 通过位置信息来估算尺度
                 s = kabsch_umeyama(t2[0], t1[0]).detach().clamp(max=10.0)
                 P1 = P1.scale(s.view(1, 1))
 

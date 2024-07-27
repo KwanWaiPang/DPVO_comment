@@ -314,12 +314,12 @@ class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网�
             # 那么net应该就是hidden state？
             net, (delta, weight, _) = self.update(net, imap[:,kk], corr, None, ii, jj, kk)
 
-            lmbda = 1e-4
+            lmbda = 1e-4 #针对update operator的阻尼系数
             target = coords[...,p//2,p//2,:] + delta
 
             ep = 10
             for itr in range(2):
-                # 通过BA优化来计算pose，Gs
+                # 通过BA优化来计算pose，Gs（同时更新patch graph）
                 Gs, patches = BA(Gs, patches, intrinsics, target, weight, lmbda, ii, jj, kk, 
                     bounds, ep=ep, fixedp=1, structure_only=structure_only)
 
