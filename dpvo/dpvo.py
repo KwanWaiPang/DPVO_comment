@@ -25,7 +25,7 @@ class DPVO:
         self.n = 0      # number of frames（第几帧）
         self.m = 0      # number of patches
         self.M = self.cfg.PATCHES_PER_FRAME
-        self.N = self.cfg.BUFFER_SIZE
+        self.N = self.cfg.BUFFER_SIZE # buffer size
 
         self.ht = ht    # image height
         self.wd = wd    # image width
@@ -59,8 +59,8 @@ class DPVO:
         else:
             self.kwargs = kwargs = {"device": "cuda", "dtype": torch.float}
         
-        self.imap_ = torch.zeros(self.mem, self.M, DIM, **kwargs)
-        self.gmap_ = torch.zeros(self.mem, self.M, 128, self.P, self.P, **kwargs)
+        self.imap_ = torch.zeros(self.mem, self.M, DIM, **kwargs)#imap 为patch的context feature（384*1*1,只关注中心点的context feature）
+        self.gmap_ = torch.zeros(self.mem, self.M, 128, self.P, self.P, **kwargs)#gmap为patch的matching feature（128*p*p）
 
         ht = ht // RES
         wd = wd // RES
