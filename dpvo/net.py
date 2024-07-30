@@ -220,7 +220,7 @@ class CorrBlock:
             corrs += [ altcorr.corr(self.gmap, self.pyramid[i], coords / self.levels[i], ii, jj, self.radius, self.dropout) ]
         return torch.stack(corrs, -1).view(1, len(ii), -1) #将所有层次的相关性结果堆叠并调整形状返回。
 
-# 定义的VO网络
+# 定义的DPVO网络
 class VONet(nn.Module):#一个继承自nn.Module的类，表示一个神经网络模型。
     # 初始化（构造）函数
     def __init__(self, use_viewer=False):
