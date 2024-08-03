@@ -71,7 +71,7 @@ class DPVO:
         # feature pyramid
         self.pyramid = (self.fmap1_, self.fmap2_)
 
-        self.net = torch.zeros(1, 0, DIM, **kwargs)
+        self.net = torch.zeros(1, 0, DIM, **kwargs) #这个应该是隐藏层的特征
         self.ii = torch.as_tensor([], dtype=torch.long, device="cuda")
         self.jj = torch.as_tensor([], dtype=torch.long, device="cuda")
         self.kk = torch.as_tensor([], dtype=torch.long, device="cuda")
