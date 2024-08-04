@@ -346,7 +346,7 @@ class DPVO:
                 self.network.patchify(image,
                     patches_per_image=self.cfg.PATCHES_PER_FRAME, ##每一帧的patch数量
                     gradient_bias=self.cfg.GRADIENT_BIAS, #是否考虑梯度的bias
-                    return_color=True)
+                    return_color=True)#进行特征的提取
 
         ### update state attributes （状态属性更新） ###
         self.tlist.append(tstamp) #更新时间戳列表 
@@ -383,10 +383,10 @@ class DPVO:
             s = torch.median(self.patches_[self.n-3:self.n,:,2])
             patches[:,:,2] = s
 
-        self.patches_[self.n] = patches
+        self.patches_[self.n] = patches #更新patches
 
         ### update network attributes 更新网络属性 ###
-        self.imap_[self.n % self.mem] = imap.squeeze()
+        self.imap_[self.n % self.mem] = imap.squeeze()#去掉一维数据
         self.gmap_[self.n % self.mem] = gmap.squeeze()
         self.fmap1_[:, self.n % self.mem] = F.avg_pool2d(fmap[0], 1, 1)
         self.fmap2_[:, self.n % self.mem] = F.avg_pool2d(fmap[0], 4, 4)
@@ -401,7 +401,7 @@ class DPVO:
 
         # 帧计数和关键帧处理
         self.n += 1
-        self.m += self.M
+        self.m += self.M #总的patch的数量
 
         # relative pose（添加前向和后向因子）
         # 这两个方法的主要功能是为当前帧计算前向和后向的边。
