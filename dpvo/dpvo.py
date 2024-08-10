@@ -285,7 +285,7 @@ class DPVO:
                 self.net, (delta, weight, _) = \
                     self.network.update(self.net, ctx, corr, None, self.ii, self.jj, self.kk)
 
-            lmbda = torch.as_tensor([1e-4], device="cuda")
+            lmbda = torch.as_tensor([1e-4], device="cuda")#给定值，不像droid那样需要计算
             weight = weight.float()
             target = coords[...,self.P//2,self.P//2] + delta.float()
 

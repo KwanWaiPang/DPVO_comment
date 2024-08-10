@@ -451,12 +451,12 @@ std::vector<torch::Tensor> cuda_ba(
   weight = weight.view({-1, 2});
 
   const int num = ii.size(0);
-  torch::Tensor B = torch::empty({6*N, 6*N}, opts);
-  torch::Tensor E = torch::empty({6*N, 1*M}, opts);
+  torch::Tensor B = torch::empty({6*N, 6*N}, opts);//H矩阵
+  torch::Tensor E = torch::empty({6*N, 1*M}, opts);//H矩阵对应的残差，对应M个patch
   torch::Tensor C = torch::empty({M}, opts);
 
-  torch::Tensor v = torch::empty({6*N}, opts);
-  torch::Tensor u = torch::empty({1*M}, opts);
+  torch::Tensor v = torch::empty({6*N}, opts);//速度
+  torch::Tensor u = torch::empty({1*M}, opts);//M个patch的速度的残差
 
   for (int itr=0; itr < iterations; itr++) {
 
