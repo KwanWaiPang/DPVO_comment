@@ -1,0 +1,30 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "run_dpvo",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "demo.py",
+            "console": "integratedTerminal",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "args":[
+                // "--imagedir=movies/IMG_0492.MOV",
+                // "--calib=calib/iphone.txt",
+                "--imagedir=/home/gwp/DBA-Fusion/dataset/dataset-corridor1_512_16/mav0/cam0/data",
+                // "--network=/home/gwp/DPVO/dpvo.pth", // dpvo的权重
+                "--calib=calib/tumvi.txt",
+                "--stride=5",
+                "--save_trajectory",
+                "--name=result_corridor1",
+                // "--viz",// 可视化
+            ]
+
+        }
+    ]
+}

@@ -6,6 +6,10 @@ import os
 import torch
 from multiprocessing import Process, Queue #导入多进程模块，进行多线程处理
 
+from pathlib import Path
+from evo.core.trajectory import PoseTrajectory3D
+from evo.tools import file_interface
+
 # 导入自定义模块（下面是dpvo自己定义的模块）
 from dpvo.utils import Timer
 from dpvo.dpvo import DPVO
@@ -63,7 +67,7 @@ def run(cfg, network, imagedir, calib, stride=1, skip=0, viz=False, timeit=False
     reader.join() #等待子进程结束
     print('finished!!!')
 
-    return slam.terminate()
+    return slam.terminate() #返回的就是pose：interpolate missing poses
 
 # 主函数
 if __name__ == '__main__':
@@ -80,6 +84,8 @@ if __name__ == '__main__':
     parser.add_argument('--config', default="config/default.yaml") #VO配置文件
     parser.add_argument('--timeit', action='store_true') #如果命令行中包含这个参数，为True，否则为False。
     parser.add_argument('--viz', action="store_true") #如果命令行中包含这个参数，为True，否则为False。
+    parser.add_argument('--save_trajectory', action="store_true") #保留轨迹
+    parser.add_argument('--name', type=str, help='name your run', default='result') #保存轨迹的名字
     
     # 解析命令行参数并将结果赋值给args。
     args = parser.parse_args()
@@ -92,7 +98,16 @@ if __name__ == '__main__':
     print(cfg)
 
     # 运行主函数
-    run(cfg, args.network, args.imagedir, args.calib, args.stride, args.skip, args.viz, args.timeit)
+    # run(cfg, args.network, args.imagedir, args.calib, args.stride, args.skip, args.viz, args.timeit)
+    (poses, tstamps)=run(cfg, args.network, args.imagedir, args.calib, args.stride, args.skip, args.viz, args.timeit)
+
+    trajectory = PoseTrajectory3D(positions_xyz=poses[:,:3], orientations_quat_wxyz=poses[:, [6, 3, 4, 5]], timestamps=tstamps)
+
+    print("Saving the result...")
+
+    if args.save_trajectory:
+        Path("saved_trajectories").mkdir(exist_ok=True)#创建一个文件夹
+        file_interface.write_tum_trajectory_file(f"saved_trajectories/{args.name}.txt", trajectory)
 
 
         

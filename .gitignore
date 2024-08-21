@@ -143,7 +143,7 @@ __pycache__
 build
 dist
 *.egg-info
-*.vscode/
+# *.vscode/
 *.pth
 tests
 checkpoints
